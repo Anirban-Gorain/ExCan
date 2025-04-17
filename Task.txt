@@ -1,1 +1,15 @@
-1. New interview window
+1. Landing page
+    1.1. Get started button
+    1.2. Direction
+2. Sign-up page
+    2.1. Input field for profile pic
+3. Dashboard
+    3.1. Remove start button form previously taken mocks
+    3.1. Add skills in previously taken mock
+4. Interview panel
+    4.1. Remove start stop video
+    4.2 Align the end interview, and take permission before closing
+    4.3 Question panel, next, previous button
+    4.4. Timer
+    4.5 Video size
+    4.6. etc
