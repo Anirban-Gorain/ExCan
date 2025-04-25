@@ -8,6 +8,10 @@ import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { setAudioStream } from "../../Redux/Slices/media";
 import { setVideoStream } from "../../Redux/Slices/media";
+import { setInterviewParameters } from "../../Redux/Slices/questionsAnswersAndInterviewInfo";
+import { setQuestions } from "../../Redux/Slices/questionsAnswersAndInterviewInfo";
+import axios from "axios";
+import Spinner from "../../components/Spinner/Spinner";
 
 const initialFormState = { jobRole: "", skills: "", experience: null };
 
@@ -28,6 +32,7 @@ export default function NewInterview() {
   const [openDialog, setOpenDialog] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const [isFetchingQuestions, setIsFetchingQuestions] = useState(false);
 
   const handleClickOpen = () => {
     setOpenDialog(true);
@@ -82,37 +87,73 @@ export default function NewInterview() {
     }
   }
 
+  // Fetching questions
+
+  async function fetchInterviewQuestions() {
+    setIsFetchingQuestions(true);
+
+    const response = await axios.post(
+      "https://api.mistral.ai/v1/chat/completions",
+      {
+        model: "mistral-tiny",
+        messages: [
+          { role: "system", content: "You are an AI interviewer." },
+          {
+            role: "user",
+            content: `Generate 10 interview questions for a ${formState.jobRole} with ${formState.experience} years of experience in ${formState.skills}`,
+          },
+        ],
+        max_tokens: 500,
+      },
+      {
+        headers: {
+          Authorization: "Bearer tSVtlD40nalC1iawzgfUxpw40vTRwEba",
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    let questions = response.data?.choices[0]?.message?.content
+      .split("\n")
+      .filter((question) => question != "")
+      .map((question) => question?.split(" ")?.slice(1)?.join(" "));
+
+    setIsFetchingQuestions(false);
+
+    return questions;
+  }
+
   // Handle start new interview function
 
   async function handleStart() {
     const ot = handleForm();
 
-    if (ot) {
-      const temp = Promise.allSettled([
-        grantTheVideoPermission(),
-        grantTheAudioPermission(),
-      ]);
+    if (!ot) return;
 
-      temp.then((res) => {
-        const audioResult = res[1];
-        const videoResult = res[0];
+    const [videoResult, audioResult] = await Promise.allSettled([
+      grantTheVideoPermission(),
+      grantTheAudioPermission(),
+    ]);
 
-        if (
-          audioResult.status === "fulfilled" &&
-          videoResult.status === "fulfilled"
-        ) {
-          // This is where we will start the interview
+    if (
+      audioResult.status === "fulfilled" &&
+      videoResult.status === "fulfilled"
+    ) {
+      await dispatch(setAudioStream(audioResult.value.stream));
+      await dispatch(setVideoStream(videoResult.value.stream));
 
-          dispatch(setAudioStream(audioResult.value.stream));
-          dispatch(setVideoStream(videoResult.value.stream));
+      const questions = await fetchInterviewQuestions();
 
-          navigate(`/interview/new/${1234}`);
-        } else {
-          handleClickOpen(true);
-        }
-      });
+      console.log(questions);
+
+      const { jobRole, skills, experience } = formState;
+
+      dispatch(setInterviewParameters({ jobRole, skills, experience }));
+      dispatch(setQuestions(questions));
+
+      navigate(`/interview/new/${1234}`);
     } else {
-      return;
+      handleClickOpen(true);
     }
   }
 
@@ -175,22 +216,29 @@ export default function NewInterview() {
         </div>
 
         <div className="w-full flex flex-col items-center">
-          <h3 className="text-xs font-bold mb-5 italic">
-            The application requires your permission to access audio for
-            processing your responses and providing feedback. Granting this
-            permission is mandatory. Additionally, the application may request
-            to enable video however, the video will not be recorded or
-            processed, and granting video access is optional.
+          <h3 className="text-xs font-bold mb-5 italic text-left">
+            The application requires your permission to access audio and video
           </h3>
 
-          <div
-            className="border-2 border-green-600 h-[50px] rounded-lg flex justify-center items-center cursor-pointer hover:bg-green-200 transition bg-green-100 w-[200px]"
-            onClick={() => handleStart()}
+          <Button
+            className="border-2 border-green-600 h-[50px] rounded-xl flex justify-center items-center cursor-pointer bg-green-100 hover:bg-green-200 transition-all duration-200 w-[200px] shadow-md"
+            onClick={handleStart}
+            disabled={isFetchingQuestions}
           >
-            <span className="flex justify-center items-center gap-x-2 text-lg font-bold text-green-600">
-              <FaPlus className="" /> START NEW
+            <span className="flex items-center gap-2 text-lg font-semibold text-green-700">
+              {isFetchingQuestions ? (
+                <>
+                  <Spinner size="5" color="green-600" />
+                  <span className="text-sm">Loading...</span>
+                </>
+              ) : (
+                <>
+                  <FaPlus />
+                  START NEW
+                </>
+              )}
             </span>
-          </div>
+          </Button>
         </div>
       </div>
 

@@ -20,11 +20,6 @@ export const mediaSlice = createSlice({
 
       state.videoStream = action.payload;
     },
-
-    // resetVideoStream: (state) => {
-    //   state.videoStream = null;
-    //   console.log("Video stream has been reset");
-    // },
   },
 });
 
