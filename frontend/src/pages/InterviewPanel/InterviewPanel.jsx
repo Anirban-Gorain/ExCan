@@ -2,20 +2,33 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { setAnswers } from "../../Redux/Slices/questionsAnswersAndInterviewInfo";
 import AudioVisualizer from "../../components/AudioVisualizer/AudioVisualizer";
+import useObjectDetection from "../../components/ObjectDetection/ObjectDetection";
 
 const InterviewPanel = () => {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isMalpractice, setIsMalpractice] = useState(!false);
-  const [warningCount, setWarningCount] = useState(0);
+
   const [spokenAns, setSpokenAns] = useState("Start speaking...");
   const [isStartAnsweringEnabled, setIsStartAnsweringEnabled] = useState(true);
+  const [malpracticeCount, setMalpracticeCount] = useState(0);
   const { videoStream } = useSelector((state) => state.media);
   const videoRef = useRef(null);
   const dispatch = useDispatch();
   const { questions, answers } = useSelector(
     (state) => state.questionsAnswersAndInterviewInfo
   );
+  const [
+    personCount,
+    prohibitedObjectsDetected,
+    isPersonMovingTooMuch,
+    warningCount,
+    error,
+    start,
+    stop,
+  ] = useObjectDetection(videoRef);
+
+  console.log(personCount);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60)
@@ -24,6 +37,13 @@ const InterviewPanel = () => {
     const secs = (seconds % 60).toString().padStart(2, "0");
     return `${mins}:${secs}`;
   };
+
+  // Malpractice counter
+
+  useEffect(() => {
+    // setMalpracticeCount((prev) => prev + 1);
+    // console.log(isMovingTooMuch, personCount, prohibitedObjects);
+  }, [isPersonMovingTooMuch, personCount, prohibitedObjectsDetected]);
 
   // Interview end handler
 
@@ -136,6 +156,8 @@ const InterviewPanel = () => {
   useEffect(() => {
     videoRef.current.srcObject = videoStream;
     videoRef.current.play();
+
+    start();
   }, []);
 
   const openModal = () => setIsModalOpen(true);
@@ -204,26 +226,63 @@ const InterviewPanel = () => {
       </div>
 
       {/* Right Panel - Video */}
-      <div className="bg-white rounded-xl shadow px-4 py-5 flex flex-col gap-4">
+      <div className="bg-white rounded-xl shadow px-4 py-5 flex flex-col gap-4 ">
         <h3 className="text-lg font-semibold text-gray-800">
           Video Processing
         </h3>
-        <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black">
+        <div
+          className={`relative w-full aspect-video rounded-2xl overflow-hidden bg-black  ${
+            isMalpractice ? "border-8 border-red-600 " : "border-0"
+          }`}
+        >
           <video
             ref={videoRef}
             autoPlay
             muted
-            className={`w-full h-full object-contain transition-all duration-300 ${
-              isMalpractice
-                ? "border-4 border-red-400"
-                : "border-4 border-green-400"
-            } rounded-xl`}
+            className="w-full h-full object-contain transition-all duration-300 rounded-xl"
           />
+
           {isMalpractice && (
             <div className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded shadow">
               Malpractice Detected
             </div>
           )}
+        </div>
+
+        {/* Message Section */}
+        <div className="mt-4 bg-gray-50 border rounded-lg p-4 text-sm text-gray-700 space-y-2">
+          <div>
+            <strong>👤 Persons Detected: </strong>
+            {personCount === 0 ? (
+              <span className="text-red-600 font-semibold">None</span>
+            ) : personCount === 1 ? (
+              <span className="text-green-600 font-semibold">1</span>
+            ) : (
+              <span className="text-red-600 font-semibold">
+                {personCount} detected
+              </span>
+            )}
+          </div>
+
+          <div>
+            🚫 <strong>Prohibited Objects:</strong>{" "}
+            {prohibitedObjectsDetected.length > 0 ? (
+              <span className="text-red-600 font-semibold">
+                {"(" + prohibitedObjectsDetected?.join(", ") + ") detected"}
+              </span>
+            ) : (
+              <span className="text-green-600 font-semibold">Not detected</span>
+            )}
+          </div>
+
+          <div>
+            🕵️ <strong>Excessive Movement:</strong>{" "}
+            {isPersonMovingTooMuch ? (
+              <span className="text-red-600 font-semibold">Detected</span>
+            ) : (
+              <span className="text-green-600 font-semibold">Not detected</span>
+            )}
+          </div>
         </div>
       </div>
     </div>
